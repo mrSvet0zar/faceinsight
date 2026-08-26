@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Model weights — never committed (cf. CLAUDE.md, stored on HF Hub / external storage)
+*.pth
+*.pt
+*.onnx
+backend/app/models/checkpoints/*
+!backend/app/models/checkpoints/.gitkeep
+
+# Datasets — several GB, downloaded locally via scripts
+data/
+*.zip
+*.tar.gz
+
+# Secrets & environment
+.env
+.env.*
+kaggle.json
+
+# Experiment tracking
+wandb/
+
+# Node / Next.js (frontend, Phase 4)
+node_modules/
+.next/
+out/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
