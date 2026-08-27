@@ -21,10 +21,14 @@ wandb>=0.16.0
 kaggle>=1.6.0
 python-dotenv>=1.0.0
 
+# Checkpoint download from HF Hub at startup (production)
+huggingface_hub>=0.23.0
+
 # Explainability (Phase 3)
 grad-cam>=1.5.0
 
 # Backend API (Phase 3)
+av>=12.0.0  # in-memory video decoding (no temp files — privacy constraint #3)
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9

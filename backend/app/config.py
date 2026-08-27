@@ -7,10 +7,15 @@ filename level and never stored, trained on, or exposed.
 
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+# backend/.env: KAGGLE_*, HF_TOKEN, FACEINSIGHT_* deployment overrides
+load_dotenv(BACKEND_DIR / ".env")
 PROJECT_ROOT = BACKEND_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data"
 
