@@ -18,6 +18,7 @@ wandb>=0.16.0
 
 # Dataset download
 kaggle>=1.6.0
+python-dotenv>=1.0.0
 
 # Explainability (Phase 3)
 grad-cam>=1.5.0

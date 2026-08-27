@@ -1,7 +1,8 @@
 """Download the three training datasets into data/ via the Kaggle API.
 
-Requires Kaggle credentials: place kaggle.json in ~/.kaggle/ (or set
-KAGGLE_USERNAME / KAGGLE_KEY). See https://www.kaggle.com/docs/api
+Credentials are read from backend/.env (KAGGLE_USERNAME + KAGGLE_KEY, with
+KAGGLE_API_TOKEN accepted as an alias for the key), or from ~/.kaggle/
+kaggle.json. See https://www.kaggle.com/docs/api
 
 Usage:
     python -m app.training.download_datasets            # all datasets
@@ -9,11 +10,22 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 import zipfile
 from pathlib import Path
 
-from app.config import CELEBA_DIR, DATA_DIR, FER2013_DIR, UTKFACE_DIR
+from dotenv import load_dotenv
+
+from app.config import BACKEND_DIR, CELEBA_DIR, DATA_DIR, FER2013_DIR, UTKFACE_DIR
+
+
+def load_kaggle_credentials() -> None:
+    """Populate KAGGLE_USERNAME/KAGGLE_KEY from backend/.env if present."""
+    load_dotenv(BACKEND_DIR / ".env")
+    token = os.environ.get("KAGGLE_API_TOKEN")
+    if token and not os.environ.get("KAGGLE_KEY"):
+        os.environ["KAGGLE_KEY"] = token
 
 # Kaggle dataset slugs
 DATASETS = {
@@ -75,6 +87,7 @@ def main() -> None:
     args = parser.parse_args()
 
     names = args.datasets or list(DATASETS)
+    load_kaggle_credentials()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     for name in names:
         try:
