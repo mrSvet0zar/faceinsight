@@ -3,7 +3,8 @@ torch>=2.2.0
 torchvision>=0.17.0
 
 # Face detection & landmarks (pre-trained, not re-trained — cf. CLAUDE.md)
-mediapipe>=0.10.9
+# >=1.0: uses the Tasks API (legacy mp.solutions was removed in 1.0)
+mediapipe>=1.0
 
 # Image processing
 opencv-python>=4.9.0

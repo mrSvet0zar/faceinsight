@@ -38,3 +38,6 @@ out/
 Thumbs.db
 .vscode/
 .idea/
+
+# MediaPipe task models (auto-downloaded at first use)
+*.tflite
