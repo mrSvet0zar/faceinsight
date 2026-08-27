@@ -9,34 +9,14 @@ alignment. Works on RGB numpy frames; input frames are never written to disk
 (privacy constraint CLAUDE.md #3).
 """
 
-import urllib.request
 from dataclasses import dataclass
-from pathlib import Path
 
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 import numpy as np
 
-# BlazeFace short-range: the only face-detector model published for the Tasks
-# API. Tuned for faces within ~2m of the camera — fine for webcam and dataset
-# crops alike.
-_MODEL_URL = (
-    "https://storage.googleapis.com/mediapipe-models/face_detector/"
-    "blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
-)
-_MODEL_DIR = Path(__file__).resolve().parent.parent / "models" / "mediapipe"
-_MODEL_PATH = _MODEL_DIR / "blaze_face_short_range.tflite"
-
-
-def _ensure_model() -> Path:
-    """Download the detector model once (~230 KB) and cache it locally."""
-    if not _MODEL_PATH.exists():
-        _MODEL_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = _MODEL_PATH.with_suffix(".tmp")
-        urllib.request.urlretrieve(_MODEL_URL, tmp)
-        tmp.replace(_MODEL_PATH)
-    return _MODEL_PATH
+from app.inference.mp_assets import ensure_model
 
 
 @dataclass
@@ -61,7 +41,9 @@ class FaceDetector:
 
     def __init__(self, min_confidence: float = 0.5):
         options = vision.FaceDetectorOptions(
-            base_options=mp_python.BaseOptions(model_asset_path=str(_ensure_model())),
+            base_options=mp_python.BaseOptions(
+                model_asset_path=str(ensure_model("face_detector"))
+            ),
             min_detection_confidence=min_confidence,
         )
         self._detector = vision.FaceDetector.create_from_options(options)
