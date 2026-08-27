@@ -10,6 +10,7 @@ model_trained=false in every response (dev mode).
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -39,10 +40,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Dev CORS — restrict to the deployed frontend origin in production
+# CORS: open in dev; set ALLOWED_ORIGINS=https://<frontend>.vercel.app in prod
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
