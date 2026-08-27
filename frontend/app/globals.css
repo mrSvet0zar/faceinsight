@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* FaceInsight — « instrument optique » : fond clair clinique, encre marine,
+   accent ambre iris, télémétrie mono. Design volontairement clair uniquement. */
+:root {
+  --paper: #f4f6f8;
+  --panel: #ffffff;
+  --ink: #16222e;
+  --muted: #5c6b7a;
+  --line: #d9e0e7;
+  --iris: #b4690e; /* ambre — actions, accents */
+  --iris-soft: #f6ead9;
+  --signal: #0e8f87; /* teal — états « live », confiance */
+  --signal-soft: #dff1ef;
+  --alert: #b3403a;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-iris: var(--iris);
+  --color-iris-soft: var(--iris-soft);
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-alert: var(--alert);
+  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
+  --font-display: var(--font-sora), var(--font-plex-sans), sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-plex-sans), system-ui, sans-serif;
+}
+
+/* Viseur : crochets de coin dessinés sur le conteneur d'analyse */
+.viewfinder {
+  position: relative;
+}
+.viewfinder::before,
+.viewfinder::after,
+.viewfinder > .vf-corners::before,
+.viewfinder > .vf-corners::after {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--signal);
+  pointer-events: none;
+  z-index: 10;
+}
+.viewfinder::before {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+}
+.viewfinder::after {
+  top: -2px;
+  right: -2px;
+  border-left: none;
+  border-bottom: none;
+}
+.viewfinder > .vf-corners::before {
+  bottom: -2px;
+  left: -2px;
+  border-right: none;
+  border-top: none;
+}
+.viewfinder > .vf-corners::after {
+  bottom: -2px;
+  right: -2px;
+  border-left: none;
+  border-top: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
