@@ -67,12 +67,50 @@ python -m app.training.explore_datasets       # statistiques par dataset
 pytest                                        # tests unitaires (sans datasets)
 ```
 
+## Résultats — run baseline (20 epochs, ResNet-18, pondérations par défaut)
+
+Rapport complet : [`reports/eval_baseline.json`](reports/eval_baseline.json).
+Test sets jamais vus à l'entraînement.
+
+| Tâche | Métrique | Baseline | Cible |
+|---|---|---|---|
+| Genre | accuracy | **92,4 %** | > 90 % ✅ |
+| Âge | MAE | **6,2 ans** | < 6 ans 🟡 |
+| Émotion | accuracy | **55,8 %** | > 65 % ❌ |
+| Pilosité faciale | macro F1 | 0,66 | — |
+| Cheveux | macro F1 | 0,71 | — |
+
+**Leçon du run 1 (documentée volontairement)** : le meilleur checkpoint était
+sélectionné sur la loss de validation pondérée, qui remontait par excès de
+confiance dès l'epoch 6 alors que les métriques continuaient de progresser
+(l'accuracy émotion a culminé à ~63 % plus tard dans le run, jamais retenue).
+Correctif : sélection sur un score composite de métriques + label smoothing
+sur l'émotion. C'est exactement le genre d'écart loss/métrique qu'un suivi
+W&B rigoureux permet d'attraper.
+
+### Analyse de biais par sous-groupe (genre/âge, UTKFace test)
+
+| Sous-groupe | n | MAE âge | Accuracy genre |
+|---|---|---|---|
+| 0-18 ans | 456 | 4,8 | **75,7 %** ⚠️ |
+| 19-35 ans | 1 032 | 3,7 | 96,4 % |
+| 36-60 ans | 623 | 7,6 | 97,4 % |
+| 61+ ans | 260 | **15,2** ⚠️ | 93,8 % |
+| Hommes | 1 273 | 6,1 | 90,3 % |
+| Femmes | 1 098 | 6,3 | 94,8 % |
+
+Deux dégradations nettes, publiées plutôt que masquées : le genre est peu
+fiable sur les visages d'enfants (traits peu genrés + sous-représentation),
+et l'âge est fortement sous-estimé chez les 61+ (260 exemples de test
+seulement — le modèle régresse vers la moyenne du dataset).
+
 ## Roadmap
 
 - [x] **Phase 1** — Datasets, loaders, preprocessing/alignement MediaPipe
-- [ ] **Phase 2** — Entraînement multi-task (Colab Pro+), suivi W&B, analyse de biais
-- [ ] **Phase 3** — Backend FastAPI (upload image/vidéo, WebSocket temps réel, Grad-CAM)
-- [ ] **Phase 4** — Frontend Next.js (webcam + consentement, upload, explicabilité)
+- [x] **Phase 2** — Entraînement multi-task (Colab), suivi W&B, analyse de biais — itération sur les pondérations en cours
+- [x] **Phase 3** — Backend FastAPI (upload image/vidéo, WebSocket temps réel, Grad-CAM, test de non-persistance)
+- [x] **Phase 4** — Frontend Next.js (webcam + consentement, upload, explicabilité, page méthodologie)
+- [ ] **Phase 5** — Déploiement public (HF Hub + Railway + Vercel), rapport d'évaluation final
 
 ## Note éthique
 

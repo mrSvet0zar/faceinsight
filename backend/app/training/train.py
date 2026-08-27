@@ -113,7 +113,9 @@ def build_losses(train_loaders, device) -> dict[str, nn.Module]:
     pos_weight = ((1 - prevalence) / prevalence.clamp(min=1e-4)).clamp(max=20.0).to(device)
 
     return {
-        "emotion": nn.CrossEntropyLoss(weight=emotion_weights),
+        # Label smoothing: the run-1 val emotion curve oscillated hard
+        # (0.47-0.63) — smoothing damps the overconfident CE spikes.
+        "emotion": nn.CrossEntropyLoss(weight=emotion_weights, label_smoothing=0.1),
         "age": nn.SmoothL1Loss(),
         "gender": nn.CrossEntropyLoss(),
         "facial_hair": nn.BCEWithLogitsLoss(pos_weight=pos_weight[:N_FACIAL_HAIR]),
@@ -230,6 +232,17 @@ def validate(model, val_loaders, losses, loss_weights, device, args):
             ).item()
 
     metrics["val/weighted_loss"] = weighted_loss
+    # Composite selection score (higher is better). Run 1 showed weighted val
+    # loss rising from overconfidence while every task metric held or improved,
+    # which froze best.pth at epoch 6 — so best is now picked on the metrics
+    # we actually report, not on the loss. MAE is scaled to a ~[0,1] range.
+    metrics["val/score"] = (
+        metrics.get("val/emotion_acc", 0.0)
+        + metrics.get("val/gender_acc", 0.0)
+        + metrics.get("val/facial_hair_f1", 0.0)
+        + metrics.get("val/hair_f1", 0.0)
+        - metrics.get("val/age_mae", 0.0) / 20.0
+    )
     return metrics
 
 
@@ -244,7 +257,7 @@ def save_checkpoint(path: Path, model, optimizer, scheduler, epoch, best, args):
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),
             "epoch": epoch,
-            "best_val_loss": best,
+            "best_score": best,
             "loss_weights": loss_weights_from_args(args),
         },
         path,
@@ -309,7 +322,7 @@ def main() -> None:
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
-    start_epoch, best_val = 0, float("inf")
+    start_epoch, best_score = 0, float("-inf")
     last_path = args.out_dir / "last.pth"
     if args.resume and last_path.exists():
         ckpt = torch.load(last_path, map_location=device)
@@ -317,7 +330,7 @@ def main() -> None:
         optimizer.load_state_dict(ckpt["optimizer"])
         scheduler.load_state_dict(ckpt["scheduler"])
         start_epoch = ckpt["epoch"] + 1
-        best_val = ckpt["best_val_loss"]
+        best_score = ckpt.get("best_score", float("-inf"))
         print(f"resumed from {last_path} at epoch {start_epoch}")
 
     if args.no_wandb:
@@ -350,15 +363,15 @@ def main() -> None:
 
         # Update best BEFORE writing last.pth, so a resumed run restores the
         # true best and cannot overwrite best.pth with a worse epoch.
-        is_best = val_metrics["val/weighted_loss"] < best_val
+        is_best = val_metrics["val/score"] > best_score
         if is_best:
-            best_val = val_metrics["val/weighted_loss"]
-        save_checkpoint(last_path, model, optimizer, scheduler, epoch, best_val, args)
+            best_score = val_metrics["val/score"]
+        save_checkpoint(last_path, model, optimizer, scheduler, epoch, best_score, args)
         if is_best:
             save_checkpoint(
-                args.out_dir / "best.pth", model, optimizer, scheduler, epoch, best_val, args
+                args.out_dir / "best.pth", model, optimizer, scheduler, epoch, best_score, args
             )
-            print(f"  -> new best (val weighted loss {best_val:.4f})")
+            print(f"  -> new best (val score {best_score:.4f})")
 
     if not args.no_wandb:
         import wandb
