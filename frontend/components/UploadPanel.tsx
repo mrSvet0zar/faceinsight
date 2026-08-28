@@ -23,7 +23,7 @@ interface Props {
 }
 
 const ACCEPT: Record<Mode, string> = {
-  image: "image/jpeg,image/png,image/webp",
+  image: "image/jpeg,image/png,image/webp,image/heic,image/heif",
   video: "video/mp4,video/webm,video/quicktime",
 };
 
@@ -38,6 +38,7 @@ export default function UploadPanel({
   const imgRef = useRef<HTMLImageElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
   const [imageResult, setImageResult] = useState<AnalyzeResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +67,7 @@ export default function UploadPanel({
     onStatus("analyse en cours…");
     try {
       if (mode === "image") {
+        setPreviewFailed(false);
         setPreviewUrl(URL.createObjectURL(file));
         const started = performance.now();
         const result = await analyzeImage(file);
@@ -98,13 +100,20 @@ export default function UploadPanel({
       <span className="vf-corners" aria-hidden />
       {previewUrl && mode === "image" ? (
         <div className="relative">
+          {previewFailed && (
+            <div className="flex aspect-video items-center justify-center rounded-md bg-paper p-6 text-center text-sm text-muted">
+              Aperçu indisponible pour ce format (HEIC) — l&apos;analyse
+              fonctionne, résultats ci-contre.
+            </div>
+          )}
           {/* eslint-disable-next-line @next/next/no-img-element -- aperçu local (object URL) */}
           <img
             ref={imgRef}
             src={previewUrl}
             alt="Image analysée"
-            className="block max-h-[520px] w-full rounded-md object-contain"
+            className={`block max-h-[520px] w-full rounded-md object-contain ${previewFailed ? "hidden" : ""}`}
             onLoad={() => imageResult && drawOverlay(imageResult)}
+            onError={() => setPreviewFailed(true)}
           />
           <canvas
             ref={overlayRef}

@@ -64,6 +64,20 @@ def test_analyze_image_rejects_garbage():
 
 
 @needs_celeba
+def test_analyze_image_accepts_heic():
+    """Smartphone photos default to HEIC — decoded via the PIL fallback."""
+    import pillow_heif
+
+    src = Image.open(io.BytesIO(celeba_jpeg()))
+    heif = pillow_heif.from_pillow(src)
+    buf = io.BytesIO()
+    heif.save(buf, format="HEIF")
+    r = client.post("/api/analyze/image", files={"file": ("photo.heic", buf.getvalue())})
+    assert r.status_code == 200
+    assert len(r.json()["faces"]) == 1
+
+
+@needs_celeba
 def test_analyze_image_with_face_full_schema():
     r = client.post("/api/analyze/image", files={"file": ("f.jpg", celeba_jpeg())})
     assert r.status_code == 200
