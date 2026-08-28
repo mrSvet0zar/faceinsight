@@ -5,8 +5,11 @@ import type {
   VideoAnalyzeResponse,
 } from "./types";
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Trailing slashes stripped: "https://api.example.com/" + "/api/..." would
+// produce a double-slash path that routes to a 404.
+export const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+).replace(/\/+$/, "");
 
 export const WS_BASE = API_BASE.replace(/^http/, "ws");
 
