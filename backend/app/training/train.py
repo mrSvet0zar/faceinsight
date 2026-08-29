@@ -108,12 +108,17 @@ def build_dataloaders(args) -> tuple[dict, dict]:
 # Losses (class-imbalance aware — cf. dataset exploration stats)
 # ---------------------------------------------------------------------------
 def build_losses(train_loaders, device) -> dict[str, nn.Module]:
-    # Emotion: inverse-frequency class weights (disgust is ~1.6% of FER2013)
+    # Emotion: inverse-frequency class weights, CLAMPED. Run 3 lesson: with
+    # FER+ majority labels, disgust became rare enough that its unclamped
+    # weight made the model predict disgust 20x more often than it occurs
+    # (454 predictions for 23 true cases on test).
     fer = train_loaders["fer2013"].dataset
     counts = torch.zeros(7)
     for _, label in fer.samples:
         counts[label] += 1
-    emotion_weights = (counts.sum() / (len(counts) * counts.clamp(min=1))).to(device)
+    emotion_weights = (
+        (counts.sum() / (len(counts) * counts.clamp(min=1))).clamp(max=5.0).to(device)
+    )
 
     # CelebA: pos_weight = neg/pos per label, clamped so ultra-rare attributes
     # (Bald 2.3%) don't blow up the gradient scale.

@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 
 from app.config import CHECKPOINTS_DIR
 from app.models.multitask_model import MultiTaskFaceModel
-from app.training.dataset_loaders import FER2013Dataset, UTKFaceDataset
+from app.training.dataset_loaders import FER2013Dataset, FERPlusDataset, UTKFaceDataset
 from app.training.transforms import eval_transform
 
 
@@ -67,6 +67,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, default=CHECKPOINTS_DIR / "best.pth")
     parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--emotion-dataset", choices=["fer2013", "ferplus"],
+                        default="fer2013",
+                        help="must match the dataset the checkpoint was trained on")
     args = parser.parse_args()
 
     ckpt = torch.load(args.checkpoint, map_location="cpu")
@@ -74,9 +77,10 @@ def main() -> None:
     model.load_state_dict(ckpt["model"])
     model.eval()
 
+    emotion_cls = FERPlusDataset if args.emotion_dataset == "ferplus" else FER2013Dataset
     calibration: dict[str, float] = {}
     for head, dataset, label_key in (
-        ("emotion", FER2013Dataset("val", transform=eval_transform), "emotion"),
+        ("emotion", emotion_cls("val", transform=eval_transform), "emotion"),
         ("gender", UTKFaceDataset("val", transform=eval_transform), "gender"),
     ):
         print(f"[{head}] collecting val logits…")

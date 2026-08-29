@@ -75,17 +75,31 @@ pytest                                        # tests unitaires (sans datasets)
 
 ## Résultats
 
-Deux runs comparés dans W&B, test sets jamais vus à l'entraînement. Rapports
-complets : [`reports/eval_baseline.json`](reports/eval_baseline.json) et
-[`reports/eval_v2.json`](reports/eval_v2.json) (modèle retenu en production).
+Trois runs comparés dans W&B, test sets jamais vus à l'entraînement.
+Rapports complets dans [`reports/`](reports/) ; le **v3** est le modèle de
+production.
 
-| Tâche | Métrique | Baseline (20 ep.) | **v2 (30 ep.)** | Cible |
-|---|---|---|---|---|
-| Émotion | accuracy | 55,8 % | **64,6 %** | > 65 % 🟡 |
-| Âge | MAE | 6,2 ans | **6,0 ans** | < 6 ans 🟡 |
-| Genre | accuracy | 92,4 % | **93,3 %** | > 90 % ✅ |
-| Pilosité faciale | macro F1 | 0,66 | **0,74** | — |
-| Cheveux | macro F1 | 0,71 | **0,73** | — |
+| Tâche | Métrique | Baseline | v2 | **v3 (FER+)** | Cible |
+|---|---|---|---|---|---|
+| Émotion | accuracy | 55,8 %¹ | 64,6 %¹ | **71,9 %²** | > 65 % ✅² |
+| Âge | MAE | 6,2 ans | 6,0 ans | **6,2 ans** | < 6 ans 🟡 |
+| Genre | accuracy | 92,4 % | 93,3 % | **94,3 %** | > 90 % ✅ |
+| Pilosité faciale | macro F1 | 0,66 | 0,74 | **0,73** | — |
+| Cheveux | macro F1 | 0,71 | 0,73 | **0,73** | — |
+
+¹ test FER2013 (labels d'origine) · ² test FER+ (labels réannotés par 10
+annotateurs) — bases de mesure non comparables entre elles : les labels FER+
+sont plus proches du consensus humain. Le run v3 combine labels FER+ et
+crops d'entraînement paddés pour reproduire la géométrie du crop d'inférence
+(correction d'un écart de domaine train/serving qui dégradait l'émotion en
+webcam). Gains v3 notables par classe : `sad` 78 % de rappel (38 % au v2),
+`angry` 72 %, enfants MAE âge 1,9 an, écart hommes/femmes refermé
+(94,1/94,5).
+
+**Défaut connu du v3** : `disgust` est sur-prédit (454 prédictions pour 23
+occurrences réelles en test) — les poids de classes en fréquence inverse
+n'étaient pas clampés et cette classe est devenue ultra-rare dans les labels
+FER+ majoritaires. Corrigé dans le code (clamp à 5,0) pour le prochain run.
 
 **La leçon du run 1 (documentée volontairement)** : le meilleur checkpoint
 était sélectionné sur la loss de validation pondérée, qui remontait par excès
@@ -100,16 +114,16 @@ Point faible restant : la classe `sad` (38,6 % de rappel, confondue avec
 `fear`/`angry`/`neutral`) — limite connue de FER2013, où ces émotions sont
 visuellement proches sur des images 48×48.
 
-### Analyse de biais par sous-groupe (genre/âge, UTKFace test, modèle v2)
+### Analyse de biais par sous-groupe (genre/âge, UTKFace test, modèle v3)
 
 | Sous-groupe | n | MAE âge | Accuracy genre |
 |---|---|---|---|
-| 0-18 ans | 456 | 2,3 | **79,6 %** ⚠️ |
-| 19-35 ans | 1 032 | 3,6 | 96,3 % |
-| 36-60 ans | 623 | 8,4 | 97,6 % |
-| 61+ ans | 260 | **16,7** ⚠️ | 95,0 % |
-| Hommes | 1 273 | 6,1 | 91,3 % |
-| Femmes | 1 098 | 5,9 | 95,6 % |
+| 0-18 ans | 456 | 1,9 | **82,7 %** ⚠️ |
+| 19-35 ans | 1 032 | 3,8 | 96,7 % |
+| 36-60 ans | 623 | 9,4 | 98,2 % |
+| 61+ ans | 260 | **15,6** ⚠️ | 95,8 % |
+| Hommes | 1 273 | 6,3 | 94,1 % |
+| Femmes | 1 098 | 6,1 | 94,5 % |
 
 Deux dégradations nettes, publiées plutôt que masquées : le genre est peu
 fiable sur les visages d'enfants (traits peu genrés + sous-représentation),
