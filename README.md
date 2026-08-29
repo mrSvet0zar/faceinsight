@@ -1,5 +1,11 @@
 # FaceInsight — Analyse Faciale Multi-Attributs
 
+[![CI](https://github.com/mrSvet0zar/faceinsight/actions/workflows/ci.yml/badge.svg)](https://github.com/mrSvet0zar/faceinsight/actions/workflows/ci.yml)
+[![Démo](https://img.shields.io/badge/d%C3%A9mo-en%20ligne-0e8f87)](https://faceinsight-topaz.vercel.app)
+[![Licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
+
+**Démo publique : [faceinsight-topaz.vercel.app](https://faceinsight-topaz.vercel.app)**
+
 Application d'analyse faciale (webcam temps réel, photo ou vidéo) qui prédit
 plusieurs attributs via un modèle de deep learning **multi-tâches fine-tuné
 maison** : émotion, âge, genre perçu, pilosité faciale, cheveux — plus une
