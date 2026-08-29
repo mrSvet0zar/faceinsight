@@ -33,8 +33,10 @@ export default function WebcamPanel({ onAnalysis, onStatus }: Props) {
   // redémarrer caméra + WebSocket à chaque analyse reçue.
   const onAnalysisRef = useRef(onAnalysis);
   const onStatusRef = useRef(onStatus);
-  onAnalysisRef.current = onAnalysis;
-  onStatusRef.current = onStatus;
+  useEffect(() => {
+    onAnalysisRef.current = onAnalysis;
+    onStatusRef.current = onStatus;
+  });
 
   const start = useCallback(() => {
     let stream: MediaStream | null = null;
