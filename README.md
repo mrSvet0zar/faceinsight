@@ -75,31 +75,35 @@ pytest                                        # tests unitaires (sans datasets)
 
 ## Résultats
 
-Trois runs comparés dans W&B, test sets jamais vus à l'entraînement.
-Rapports complets dans [`reports/`](reports/) ; le **v3** est le modèle de
+Quatre runs comparés dans W&B, test sets jamais vus à l'entraînement.
+Rapports complets dans [`reports/`](reports/) ; le **v4** est le modèle de
 production.
 
-| Tâche | Métrique | Baseline | v2 | **v3 (FER+)** | Cible |
-|---|---|---|---|---|---|
-| Émotion | accuracy | 55,8 %¹ | 64,6 %¹ | **71,9 %²** | > 65 % ✅² |
-| Âge | MAE | 6,2 ans | 6,0 ans | **6,2 ans** | < 6 ans 🟡 |
-| Genre | accuracy | 92,4 % | 93,3 % | **94,3 %** | > 90 % ✅ |
-| Pilosité faciale | macro F1 | 0,66 | 0,74 | **0,73** | — |
-| Cheveux | macro F1 | 0,71 | 0,73 | **0,73** | — |
+| Tâche | Métrique | Baseline | v2 | v3 (FER+) | **v4** | Cible |
+|---|---|---|---|---|---|---|
+| Émotion | accuracy | 55,8 %¹ | 64,6 %¹ | 71,9 %² | **79,6 %²** | > 65 % ✅ |
+| Âge | MAE | 6,2 | 6,0 | 6,2 | **6,4 ans** | < 6 ans 🟡 |
+| Genre | accuracy | 92,4 % | 93,3 % | 94,3 % | **94,2 %** | > 90 % ✅ |
+| Pilosité faciale | macro F1 | 0,66 | 0,74 | 0,73 | **0,73** | — |
+| Cheveux | macro F1 | 0,71 | 0,73 | 0,73 | **0,73** | — |
 
 ¹ test FER2013 (labels d'origine) · ² test FER+ (labels réannotés par 10
 annotateurs) — bases de mesure non comparables entre elles : les labels FER+
-sont plus proches du consensus humain. Le run v3 combine labels FER+ et
-crops d'entraînement paddés pour reproduire la géométrie du crop d'inférence
-(correction d'un écart de domaine train/serving qui dégradait l'émotion en
-webcam). Gains v3 notables par classe : `sad` 78 % de rappel (38 % au v2),
-`angry` 72 %, enfants MAE âge 1,9 an, écart hommes/femmes refermé
-(94,1/94,5).
+sont plus proches du consensus humain.
 
-**Défaut connu du v3** : `disgust` est sur-prédit (454 prédictions pour 23
-occurrences réelles en test) — les poids de classes en fréquence inverse
-n'étaient pas clampés et cette classe est devenue ultra-rare dans les labels
-FER+ majoritaires. Corrigé dans le code (clamp à 5,0) pour le prochain run.
+**L'histoire des quatre runs** (chaque itération corrige un défaut
+diagnostiqué dans les données — détails dans les commits et W&B) :
+1. **Baseline** : best sélectionné sur la loss de validation pondérée, qui
+   remontait par surconfiance dès l'epoch 6 → modèle sous-entraîné.
+2. **v2** : sélection sur un score composite de métriques + label smoothing
+   → +8,8 pts d'émotion, mais un écart de domaine train/serving subsistait
+   (crops d'entraînement serrés vs crop d'inférence élargi de 35 %).
+3. **v3** : labels FER+ + crops paddés à la géométrie d'inférence → gros
+   gains (`sad` 38 → 78 % de rappel), mais les poids de classes non clampés
+   rencontrent le `disgust` devenu ultra-rare → sur-prédit 20×.
+4. **v4** : poids clampés à 5,0 → `disgust` revient à la normale (17
+   prédictions pour 23 cas), rappel `neutral` 59,9 → **81,7 %**, émotion
+   **79,6 %**.
 
 **La leçon du run 1 (documentée volontairement)** : le meilleur checkpoint
 était sélectionné sur la loss de validation pondérée, qui remontait par excès
@@ -114,16 +118,16 @@ Point faible restant : la classe `sad` (38,6 % de rappel, confondue avec
 `fear`/`angry`/`neutral`) — limite connue de FER2013, où ces émotions sont
 visuellement proches sur des images 48×48.
 
-### Analyse de biais par sous-groupe (genre/âge, UTKFace test, modèle v3)
+### Analyse de biais par sous-groupe (genre/âge, UTKFace test, modèle v4)
 
 | Sous-groupe | n | MAE âge | Accuracy genre |
 |---|---|---|---|
-| 0-18 ans | 456 | 1,9 | **82,7 %** ⚠️ |
-| 19-35 ans | 1 032 | 3,8 | 96,7 % |
-| 36-60 ans | 623 | 9,4 | 98,2 % |
-| 61+ ans | 260 | **15,6** ⚠️ | 95,8 % |
-| Hommes | 1 273 | 6,3 | 94,1 % |
-| Femmes | 1 098 | 6,1 | 94,5 % |
+| 0-18 ans | 456 | 2,1 | **82,5 %** ⚠️ |
+| 19-35 ans | 1 032 | 3,8 | 97,1 % |
+| 36-60 ans | 623 | 9,3 | 97,4 % |
+| 61+ ans | 260 | **17,1** ⚠️ | 95,4 % |
+| Hommes | 1 273 | 6,5 | 94,0 % |
+| Femmes | 1 098 | 6,2 | 94,4 % |
 
 Deux dégradations nettes, publiées plutôt que masquées : le genre est peu
 fiable sur les visages d'enfants (traits peu genrés + sous-représentation),
