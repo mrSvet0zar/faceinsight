@@ -116,6 +116,25 @@ fiable sur les visages d'enfants (traits peu genrés + sous-représentation),
 et l'âge est fortement sous-estimé chez les 61+ (260 exemples de test
 seulement — le modèle régresse vers la moyenne du dataset).
 
+## Optimisation de l'inférence (benchmark CPU)
+
+Export ONNX + quantization benchmarkés sur le checkpoint v2
+(`python -m app.training.export_onnx`, une image 224×224, 50 itérations) :
+
+| Moteur | Latence moyenne | p95 | Taille |
+|---|---|---|---|
+| PyTorch eager | 12,2 ms | 13,6 ms | 136 Mo |
+| **ONNX FP32** | **5,7 ms** (×2,1) | 12,5 ms | 47 Mo |
+| ONNX INT8 (dynamique) | 18,8 ms | 55,8 ms | 12 Mo |
+
+Parité numérique FP32/eager : écart max 1,9 × 10⁻⁶. Résultat notable et
+assumé : la quantization **dynamique** INT8 est *plus lente* que FP32 sur
+un convnet CPU (surcoût de quantize/dequantize à chaque convolution) — elle
+ne se justifierait ici que pour la taille. La voie d'optimisation suivante
+serait une quantization **statique** QDQ avec jeu de calibration. L'API de
+production sert le modèle PyTorch (latence déjà largement sous la cible) ;
+l'export ONNX est le chemin documenté pour un déploiement CPU contraint.
+
 ## Roadmap
 
 - [x] **Phase 1** — Datasets, loaders, preprocessing/alignement MediaPipe

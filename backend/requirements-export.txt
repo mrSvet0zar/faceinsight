@@ -1,0 +1,5 @@
+# Export/benchmark ONNX uniquement (app.training.export_onnx) — pas requis
+# en production, où l'API sert le modèle PyTorch.
+onnx>=1.16
+onnxruntime>=1.18
+onnxscript>=0.1
