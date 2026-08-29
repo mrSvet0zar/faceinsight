@@ -101,6 +101,107 @@ class FER2013Dataset(Dataset):
 
 
 # ---------------------------------------------------------------------------
+# FER+ — emotion with crowd-sourced relabels (10 annotators per image)
+# ---------------------------------------------------------------------------
+# Inference feeds the model a MediaPipe-aligned crop widened by CROP_MARGIN
+# (35%) around the face box; FER images are tight face crops. Padding them
+# with replicated borders at load time closes that train/inference geometry
+# gap for the emotion head. ~0.175 of the image per side ≈ the margin the
+# aligned crop adds around the detection box.
+FER_CONTEXT_PAD_FRACTION = 0.175
+
+# FER+ vote columns, in fer2013new.csv order. unknown/NF must take part in
+# the vote so that a mostly-unlabelable image is dropped, not misread as the
+# first emotion column.
+_FERPLUS_COLS = [
+    "neutral", "happiness", "surprise", "sadness",
+    "anger", "disgust", "fear", "contempt", "unknown", "NF",
+]
+# FER+ emotion name -> our EMOTION_CLASSES index (contempt intentionally
+# absent: images whose majority vote is contempt/unknown/NF are dropped to
+# keep the 7-class head and API unchanged)
+_FERPLUS_TO_CLASS = {
+    "neutral": EMOTION_CLASSES.index("neutral"),
+    "happiness": EMOTION_CLASSES.index("happy"),
+    "surprise": EMOTION_CLASSES.index("surprise"),
+    "sadness": EMOTION_CLASSES.index("sad"),
+    "anger": EMOTION_CLASSES.index("angry"),
+    "disgust": EMOTION_CLASSES.index("disgust"),
+    "fear": EMOTION_CLASSES.index("fear"),
+}
+
+
+def _pad_context(image: Image.Image) -> Image.Image:
+    """Replicate-pad a tight face crop to match the inference crop geometry."""
+    import numpy as np
+
+    pad = int(image.size[0] * FER_CONTEXT_PAD_FRACTION)
+    array = np.array(image)
+    array = np.pad(array, [(pad, pad), (pad, pad)] + [(0, 0)] * (array.ndim - 2), mode="edge")
+    return Image.fromarray(array)
+
+
+class FERPlusDataset(Dataset):
+    """FER2013 images with FER+ majority-vote labels (Barsoum et al. 2016).
+
+    Requires data/fer2013/fer2013.csv (original pixel CSV) and
+    data/fer2013/fer2013new.csv (FER+ votes) — see download_datasets.py.
+    Usage column gives the official split: Training / PublicTest (val) /
+    PrivateTest (test).
+    """
+
+    _USAGE = {"train": "Training", "val": "PublicTest", "test": "PrivateTest"}
+
+    def __init__(
+        self,
+        split: str = "train",
+        root: Path = FER2013_DIR,
+        transform: Optional[Transform] = None,
+        pad_context: bool = True,
+    ):
+        self.transform = transform
+        self.pad_context = pad_context
+        pixels_csv = root / "fer2013.csv"
+        votes_csv = root / "fer2013new.csv"
+        if not pixels_csv.exists() or not votes_csv.exists():
+            raise FileNotFoundError(
+                f"FER+ needs {pixels_csv.name} and {votes_csv.name} in {root} — "
+                "run app.training.download_datasets ferplus"
+            )
+
+        pixels = pd.read_csv(pixels_csv)
+        votes = pd.read_csv(votes_csv)
+        assert len(pixels) == len(votes), "fer2013.csv / fer2013new.csv misaligned"
+
+        usage = self._USAGE[split]
+        mask = pixels["Usage"] == usage
+        vote_matrix = votes.loc[mask, _FERPLUS_COLS].to_numpy()
+        winner = vote_matrix.argmax(axis=1)
+        winner_name = [_FERPLUS_COLS[i] for i in winner]
+
+        self.samples: list[tuple[str, int]] = []
+        for pixel_str, name in zip(pixels.loc[mask, "pixels"], winner_name):
+            label = _FERPLUS_TO_CLASS.get(name)
+            if label is not None:  # drops contempt-majority images
+                self.samples.append((pixel_str, label))
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, i: int):
+        import numpy as np
+
+        pixel_str, label = self.samples[i]
+        array = np.fromstring(pixel_str, dtype=np.uint8, sep=" ").reshape(48, 48)
+        image = Image.fromarray(array).convert("RGB")
+        if self.pad_context:
+            image = _pad_context(image)
+        if self.transform:
+            image = self.transform(image)
+        return image, {"emotion": torch.tensor(label, dtype=torch.long)}
+
+
+# ---------------------------------------------------------------------------
 # UTKFace — age + gender
 # ---------------------------------------------------------------------------
 class UTKFaceDataset(Dataset):

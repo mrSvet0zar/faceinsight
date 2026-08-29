@@ -67,6 +67,60 @@ def test_fer2013_train_val_disjoint(fer_root):
 
 
 # ---------------------------------------------------------------------------
+# FER+
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def ferplus_root(tmp_path):
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    rows_px, rows_votes = [], []
+    # 6 samples: happy-majority (train), anger-majority (train), contempt-
+    # majority (must be dropped), NF-majority (dropped), one val, one test
+    specs = [
+        ("Training", {"happiness": 8}),
+        ("Training", {"anger": 7, "neutral": 2}),
+        ("Training", {"contempt": 9}),
+        ("Training", {"NF": 10}),
+        ("PublicTest", {"sadness": 6}),
+        ("PrivateTest", {"surprise": 5}),
+    ]
+    vote_cols = ["neutral", "happiness", "surprise", "sadness", "anger",
+                 "disgust", "fear", "contempt", "unknown", "NF"]
+    for usage, votes in specs:
+        pixels = " ".join(str(v) for v in rng.integers(0, 255, 48 * 48))
+        rows_px.append({"emotion": 0, "pixels": pixels, "Usage": usage})
+        rows_votes.append(
+            {"Usage": usage, "Image name": "x.png",
+             **{c: votes.get(c, 0) for c in vote_cols}}
+        )
+    import pandas as pd
+
+    pd.DataFrame(rows_px).to_csv(tmp_path / "fer2013.csv", index=False)
+    pd.DataFrame(rows_votes).to_csv(tmp_path / "fer2013new.csv", index=False)
+    return tmp_path
+
+
+def test_ferplus_majority_labels_and_drops(ferplus_root):
+    from app.config import EMOTION_CLASSES
+    from app.training.dataset_loaders import FERPlusDataset
+
+    train = FERPlusDataset("train", root=ferplus_root)
+    # contempt- and NF-majority images are dropped
+    assert len(train) == 2
+    labels = {label for _, label in train.samples}
+    assert labels == {EMOTION_CLASSES.index("happy"), EMOTION_CLASSES.index("angry")}
+
+    image, target = train[0]
+    # 48px core + 0.175 replicate padding per side (inference crop geometry)
+    assert image.size == (64, 64)
+    assert 0 <= target["emotion"].item() < len(EMOTION_CLASSES)
+
+    assert len(FERPlusDataset("val", root=ferplus_root)) == 1
+    assert len(FERPlusDataset("test", root=ferplus_root)) == 1
+
+
+# ---------------------------------------------------------------------------
 # UTKFace
 # ---------------------------------------------------------------------------
 @pytest.fixture

@@ -5,6 +5,7 @@ Privacy (constraint #3): frames are numpy arrays in memory from start to
 finish; nothing is ever written to disk and no reference outlives the call.
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -59,6 +60,31 @@ def resolve_checkpoint() -> Optional[Path]:
     default = CHECKPOINTS_DIR / "best.pth"
     return default if default.exists() else None
 
+
+def load_calibration(checkpoint_path: Optional[Path]) -> dict[str, float]:
+    """Per-head softmax temperatures (see training/calibrate.py).
+
+    Looked up next to the checkpoint, then on the HF repo. Missing file =>
+    identity (T=1), never an error.
+    """
+    import os
+
+    if checkpoint_path is not None:
+        local = checkpoint_path.parent / "calibration.json"
+        if local.exists():
+            return json.loads(local.read_text())
+
+    hf_repo = os.environ.get("FACEINSIGHT_HF_REPO")
+    if hf_repo:
+        try:
+            from huggingface_hub import hf_hub_download
+
+            path = hf_hub_download(repo_id=hf_repo, filename="calibration.json")
+            return json.loads(Path(path).read_text())
+        except Exception:  # noqa: BLE001 — calibration is optional
+            logger.info("no calibration.json on %s, using T=1", hf_repo)
+    return {}
+
 _HAIR_IDX = {name: i for i, name in enumerate(HAIR_ATTRS)}
 _FH_IDX = {name: i for i, name in enumerate(FACIAL_HAIR_ATTRS)}
 _HAIR_COLORS_FR = {
@@ -83,19 +109,26 @@ class Predictor:
         checkpoint_path = checkpoint_path or resolve_checkpoint()
 
         self.trained = checkpoint_path is not None and checkpoint_path.exists()
+        self.epoch: Optional[int] = None
         # Untrained fallback keeps the whole API testable before the first
         # real checkpoint lands; responses are flagged via model_trained.
         self.model = MultiTaskFaceModel(pretrained=not self.trained)
         if self.trained:
             ckpt = torch.load(checkpoint_path, map_location=self.device)
             self.model.load_state_dict(ckpt["model"])
-            logger.info("loaded checkpoint %s (epoch %s)", checkpoint_path, ckpt.get("epoch"))
+            self.epoch = ckpt.get("epoch")
+            del ckpt
+            logger.info("loaded checkpoint %s (epoch %s)", checkpoint_path, self.epoch)
         else:
             logger.warning(
                 "no checkpoint found (looked at %s) — running with UNTRAINED heads (dev mode)",
                 checkpoint_path or CHECKPOINTS_DIR / "best.pth",
             )
         self.model.to(self.device).eval()
+
+        self.calibration = load_calibration(checkpoint_path)
+        if self.calibration:
+            logger.info("calibration temperatures: %s", self.calibration)
 
         self.detector = FaceDetector()
         self.eye_estimator = EyeColorEstimator()
@@ -117,9 +150,12 @@ class Predictor:
         aligned = align_face(image_rgb, face)
         outputs = self.model(to_model_tensor(aligned).to(self.device))
 
-        emotion_probs = outputs["emotion"].softmax(dim=-1)[0]
+        # Calibrated softmax: logits / T so displayed confidences are honest
+        t_emotion = self.calibration.get("emotion", 1.0)
+        t_gender = self.calibration.get("gender", 1.0)
+        emotion_probs = (outputs["emotion"] / t_emotion).softmax(dim=-1)[0]
         emotion_idx = int(emotion_probs.argmax())
-        gender_probs = outputs["gender"].softmax(dim=-1)[0]
+        gender_probs = (outputs["gender"] / t_gender).softmax(dim=-1)[0]
         gender_idx = int(gender_probs.argmax())
         age = max(0, int(round(float(outputs["age"][0, 0]))))
         fh = outputs["facial_hair"].sigmoid()[0]

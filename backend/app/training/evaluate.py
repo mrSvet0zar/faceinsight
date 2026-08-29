@@ -24,7 +24,12 @@ from app.config import (
     HAIR_ATTRS,
 )
 from app.models.multitask_model import MultiTaskFaceModel
-from app.training.dataset_loaders import CelebADataset, FER2013Dataset, UTKFaceDataset
+from app.training.dataset_loaders import (
+    CelebADataset,
+    FER2013Dataset,
+    FERPlusDataset,
+    UTKFaceDataset,
+)
 from app.training.metrics import accuracy, confusion_matrix, mae, multilabel_f1
 from app.training.train import N_FACIAL_HAIR
 from app.training.transforms import eval_transform
@@ -51,8 +56,9 @@ def collect(model, dataset, device, batch_size, num_workers, tasks):
 
 
 def evaluate_emotion(model, device, args, report):
+    emotion_cls = FERPlusDataset if args.emotion_dataset == "ferplus" else FER2013Dataset
     outs, tgts = collect(
-        model, FER2013Dataset("test", transform=eval_transform),
+        model, emotion_cls("test", transform=eval_transform),
         device, args.batch_size, args.num_workers, ("emotion",),
     )
     logits, labels = outs["emotion"], tgts["emotion"]
@@ -136,6 +142,9 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--num-workers", type=int, default=2)
     parser.add_argument("--json", type=Path, default=None, help="write full report as JSON")
+    parser.add_argument("--emotion-dataset", choices=["fer2013", "ferplus"],
+                        default="fer2013",
+                        help="must match the dataset the checkpoint was trained on")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

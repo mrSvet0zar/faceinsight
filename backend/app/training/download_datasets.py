@@ -34,6 +34,13 @@ DATASETS = {
         "target": FER2013_DIR,
         "expect": "train",  # folder present after extraction if already done
     },
+    # Original pixel CSV — required by the FER+ loader (fer2013new.csv rows
+    # align with it). The FER+ vote file itself comes from GitHub, see below.
+    "ferplus": {
+        "slug": "deadskull7/fer2013",
+        "target": FER2013_DIR,
+        "expect": "fer2013.csv",
+    },
     "utkface": {
         "slug": "jangedoo/utkface-new",
         "target": UTKFACE_DIR,
@@ -72,7 +79,23 @@ def download(name: str, force: bool = False) -> None:
             zf.extractall(target)
         zip_path.unlink()
 
+    if name == "ferplus":
+        _download_ferplus_votes(target)
+
     print(f"[{name}] done.")
+
+
+def _download_ferplus_votes(target: Path) -> None:
+    """fer2013new.csv: the 10-annotator FER+ votes (microsoft/FERPlus, MIT)."""
+    import urllib.request
+
+    votes = target / "fer2013new.csv"
+    if not votes.exists():
+        url = "https://raw.githubusercontent.com/microsoft/FERPlus/master/fer2013new.csv"
+        print(f"[ferplus] downloading fer2013new.csv from GitHub ...")
+        tmp = votes.with_suffix(".tmp")
+        urllib.request.urlretrieve(url, tmp)
+        tmp.replace(votes)
 
 
 def main() -> None:

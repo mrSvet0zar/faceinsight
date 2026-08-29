@@ -29,7 +29,12 @@ from torch.utils.data import DataLoader, RandomSampler
 
 from app.config import CHECKPOINTS_DIR, FACIAL_HAIR_ATTRS
 from app.models.multitask_model import MultiTaskFaceModel
-from app.training.dataset_loaders import CelebADataset, FER2013Dataset, UTKFaceDataset
+from app.training.dataset_loaders import (
+    CelebADataset,
+    FER2013Dataset,
+    FERPlusDataset,
+    UTKFaceDataset,
+)
 from app.training.metrics import accuracy, mae, multilabel_f1
 from app.training.transforms import eval_transform, train_transform
 
@@ -58,13 +63,16 @@ DEFAULT_LOSS_WEIGHTS = {
 # ---------------------------------------------------------------------------
 def build_dataloaders(args) -> tuple[dict, dict]:
     """Return ({name: train_loader}, {name: val_loader})."""
+    # --emotion-dataset ferplus: crowd-relabeled FER2013 + context padding
+    # matching the inference crop geometry (see FERPlusDataset docstring)
+    emotion_cls = FERPlusDataset if args.emotion_dataset == "ferplus" else FER2013Dataset
     train_sets = {
-        "fer2013": FER2013Dataset("train", transform=train_transform),
+        "fer2013": emotion_cls("train", transform=train_transform),
         "utkface": UTKFaceDataset("train", transform=train_transform),
         "celeba": CelebADataset("train", transform=train_transform),
     }
     val_sets = {
-        "fer2013": FER2013Dataset("val", transform=eval_transform),
+        "fer2013": emotion_cls("val", transform=eval_transform),
         "utkface": UTKFaceDataset("val", transform=eval_transform),
         "celeba": CelebADataset("val", transform=eval_transform),
     }
@@ -285,6 +293,9 @@ def main() -> None:
                         help="epochs with frozen backbone (heads-only warmup)")
     parser.add_argument("--celeba-frac", type=float, default=0.25,
                         help="fraction of CelebA sampled per epoch")
+    parser.add_argument("--emotion-dataset", choices=["fer2013", "ferplus"],
+                        default="fer2013",
+                        help="ferplus: FER+ crowd relabels + context padding")
     parser.add_argument("--num-workers", type=int, default=2)
     parser.add_argument("--out-dir", type=Path, default=CHECKPOINTS_DIR,
                         help="checkpoint dir (point at Google Drive on Colab)")

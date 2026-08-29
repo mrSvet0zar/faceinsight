@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { openRealtimeSocket } from "@/lib/api";
 import { drawFaces } from "@/lib/overlay";
+import { FaceSmoother } from "@/lib/smoothing";
 import type { AnalyzeResponse } from "@/lib/types";
 
 /** Largeur des frames envoyées au serveur (le flux affiché reste en pleine résolution). */
@@ -25,6 +26,7 @@ export default function WebcamPanel({ onAnalysis, onStatus }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const captureRef = useRef<HTMLCanvasElement | null>(null);
+  const smootherRef = useRef(new FaceSmoother());
   const [error, setError] = useState<string | null>(null);
 
   // Les callbacks parent changent à chaque rendu : refs pour ne pas
@@ -91,7 +93,12 @@ export default function WebcamPanel({ onAnalysis, onStatus }: Props) {
         if (stopped) return;
         const body = JSON.parse(event.data);
         if (!body.error) {
-          const result = body as AnalyzeResponse;
+          const raw = body as AnalyzeResponse;
+          // Lissage temporel du visage principal (anti-flicker émotion/âge)
+          const smoothed = smootherRef.current.smooth(raw.faces[0] ?? null);
+          const result: AnalyzeResponse = smoothed
+            ? { ...raw, faces: [smoothed, ...raw.faces.slice(1)] }
+            : raw;
           const latency = Math.round(performance.now() - sentAt);
           const overlay = overlayRef.current;
           const capture = captureRef.current;

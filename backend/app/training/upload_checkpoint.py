@@ -57,6 +57,14 @@ def main() -> None:
             path_in_repo="eval_report.json",
             repo_id=args.repo,
         )
+    calibration = args.checkpoint.parent / "calibration.json"
+    if calibration.exists():
+        api.upload_file(
+            path_or_fileobj=str(calibration),
+            path_in_repo="calibration.json",
+            repo_id=args.repo,
+        )
+        print("calibration.json uploaded")
     print(f"done — set FACEINSIGHT_HF_REPO={args.repo} on the backend")
 
 
