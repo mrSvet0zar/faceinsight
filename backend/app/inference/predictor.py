@@ -103,6 +103,14 @@ class Predictor:
         checkpoint_path: Optional[Path] = None,
         device: Optional[str] = None,
     ):
+        import os
+
+        # In CPU containers, cap intra-op threads to the actual CPU quota
+        # (cf. Dockerfile) instead of torch's host-core default.
+        torch_threads = int(os.environ.get("TORCH_NUM_THREADS", "0"))
+        if torch_threads > 0:
+            torch.set_num_threads(torch_threads)
+
         self.device = torch.device(
             device or ("cuda" if torch.cuda.is_available() else "cpu")
         )
